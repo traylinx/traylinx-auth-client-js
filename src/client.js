@@ -27,7 +27,7 @@ class TraylinxAuthClient {
          * 
          * @throws {Error} If any configuration parameter is invalid
          */
-        
+
         // Prepare configuration object
         const configParams = {
             clientId: clientId || process.env.TRAYLINX_CLIENT_ID,
@@ -40,7 +40,7 @@ class TraylinxAuthClient {
             cacheTokens: options.cacheTokens !== undefined ? options.cacheTokens : true,
             logLevel: options.logLevel || 'INFO'
         };
-        
+
         // Validate configuration
         try {
             this.config = validateConfig(configParams);
@@ -53,17 +53,18 @@ class TraylinxAuthClient {
                 400
             );
         }
-        
+
         // Set instance attributes from validated config
         this.clientId = this.config.clientId;
         this.clientSecret = this.config.clientSecret;
-        this.apiBaseUrl = this.config.apiBaseUrl;
+        // Normalize apiBaseUrl by removing trailing slash to prevent double slashes
+        this.apiBaseUrl = this.config.apiBaseUrl.replace(/\/+$/, '');
         this.agentUserId = this.config.agentUserId;
 
         this.accessToken = null;
         this.agentSecretToken = null;
         this.tokenExpiration = null;
-        
+
         // Initialize axios instance with retry configuration
         this.axiosInstance = this._createAxiosInstanceWithRetries();
     }
@@ -90,7 +91,7 @@ class TraylinxAuthClient {
             (response) => response, // Success case - return response as-is
             async (error) => {
                 const config = error.config;
-                
+
                 // Initialize retry count if not present
                 if (!config.__retryCount) {
                     config.__retryCount = 0;
@@ -98,16 +99,16 @@ class TraylinxAuthClient {
 
                 // Check if we should retry
                 const shouldRetry = this._shouldRetry(error, config);
-                
+
                 if (shouldRetry && config.__retryCount < this.config.maxRetries) {
                     config.__retryCount++;
-                    
+
                     // Calculate delay with exponential backoff
                     const delay = this._calculateRetryDelay(config.__retryCount);
-                    
+
                     // Wait before retrying
                     await this._sleep(delay);
-                    
+
                     // Retry the request
                     return instance(config);
                 }
@@ -165,7 +166,7 @@ class TraylinxAuthClient {
         const baseDelay = this.config.retryDelay;
         const exponentialDelay = baseDelay * Math.pow(2, retryCount - 1);
         const jitter = Math.random() * 0.1 * exponentialDelay; // 10% jitter
-        
+
         return Math.min(exponentialDelay + jitter, 30000); // Cap at 30 seconds
     }
 
@@ -278,7 +279,7 @@ class TraylinxAuthClient {
             });
 
             const tokenData = response.data;
-            
+
             // Validate token response structure
             const requiredFields = ['access_token', 'agent_secret_token', 'expires_in'];
             const missingFields = requiredFields.filter(field => !(field in tokenData));
@@ -293,7 +294,7 @@ class TraylinxAuthClient {
             this.accessToken = tokenData.access_token;
             this.agentSecretToken = tokenData.agent_secret_token;
             this.tokenExpiration = Date.now() + (tokenData.expires_in * 1000);
-            
+
         } catch (error) {
             if (error instanceof TraylinxAuthError) {
                 throw error; // Re-throw our custom errors
@@ -306,7 +307,7 @@ class TraylinxAuthClient {
         if (!this.accessToken || Date.now() >= this.tokenExpiration) {
             await this._fetchTokens();
         }
-        
+
         if (!this.accessToken) {
             throw new TokenExpiredError(
                 'Access token is not available. Token fetch may have failed.',
@@ -314,7 +315,7 @@ class TraylinxAuthClient {
                 401
             );
         }
-        
+
         return this.accessToken;
     }
 
@@ -322,7 +323,7 @@ class TraylinxAuthClient {
         if (!this.agentSecretToken || Date.now() >= this.tokenExpiration) {
             await this._fetchTokens();
         }
-        
+
         if (!this.agentSecretToken) {
             throw new TokenExpiredError(
                 'Agent secret token is not available. Token fetch may have failed.',
@@ -330,7 +331,7 @@ class TraylinxAuthClient {
                 401
             );
         }
-        
+
         return this.agentSecretToken;
     }
 
@@ -391,9 +392,9 @@ class TraylinxAuthClient {
                     401
                 );
             }
-            
+
             return false;
-            
+
         } catch (error) {
             if (error instanceof TraylinxAuthError) {
                 throw error; // Re-throw our custom errors
@@ -404,24 +405,24 @@ class TraylinxAuthClient {
 
     async rpcCall(method, params, rpcUrl = null, includeAgentCredentials = null) {
         rpcUrl = rpcUrl || `${this.apiBaseUrl}/a2a/rpc`;
-        
+
         // Auto-detect: if calling auth service (default), only use access_token
         // If calling another agent, use ONLY agent_secret_token (NO access_token!)
         if (includeAgentCredentials === null) {
             includeAgentCredentials = rpcUrl !== `${this.apiBaseUrl}/a2a/rpc`;
         }
-        
+
         const payload = {
             jsonrpc: '2.0',
             method: method,
             params: params,
             id: uuidv4(),
         };
-        
+
         let headers = {
             'Content-Type': 'application/json',
         };
-        
+
         if (includeAgentCredentials) {
             // When calling other agents: use ONLY agent_secret_token
             const agentSecretToken = await this.getAgentSecretToken();
@@ -432,21 +433,21 @@ class TraylinxAuthClient {
             const accessToken = await this.getAccessToken();
             headers['Authorization'] = `Bearer ${accessToken}`;
         }
-        
+
         try {
-            const response = await this.axiosInstance.post(rpcUrl, payload, { 
+            const response = await this.axiosInstance.post(rpcUrl, payload, {
                 headers
             });
-            
+
             try {
                 const result = response.data;
-                
+
                 // Check for JSON-RPC error response
                 if (result.error) {
                     const errorInfo = result.error;
                     const errorCode = errorInfo.code || 'RPC_ERROR';
                     const errorMessage = errorInfo.message || 'RPC call failed';
-                    
+
                     if (errorCode === -32600) { // Invalid Request
                         throw new ValidationError(
                             `Invalid RPC request: ${errorMessage}`,
@@ -473,9 +474,9 @@ class TraylinxAuthClient {
                         );
                     }
                 }
-                
+
                 return result;
-                
+
             } catch (parseError) {
                 if (parseError instanceof TraylinxAuthError) {
                     throw parseError; // Re-throw our custom errors
@@ -486,7 +487,7 @@ class TraylinxAuthClient {
                     200
                 );
             }
-            
+
         } catch (error) {
             if (error instanceof TraylinxAuthError) {
                 throw error; // Re-throw our custom errors
