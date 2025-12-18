@@ -22,13 +22,13 @@ A robust, enterprise-grade Node.js library for Traylinx Sentinel Agent-to-Agent 
 ### Using npm
 
 ```bash
-npm install @traylinx/auth-client
+npm install traylinx-auth-client
 ```
 
 ### Using Yarn
 
 ```bash
-yarn add @traylinx/auth-client
+yarn add traylinx-auth-client
 ```
 
 ### Requirements
@@ -41,7 +41,7 @@ yarn add @traylinx/auth-client
 ## ⚡ Quick Start (5 lines)
 
 ```javascript
-const { makeA2ARequest } = require('@traylinx/auth-client');
+const { makeA2ARequest } = require('traylinx-auth-client');
 
 // Set environment variables: TRAYLINX_CLIENT_ID, TRAYLINX_CLIENT_SECRET, 
 // TRAYLINX_API_BASE_URL, TRAYLINX_AGENT_USER_ID
@@ -67,7 +67,7 @@ export TRAYLINX_AGENT_USER_ID="12345678-1234-1234-1234-123456789abc"
 ### Programmatic Configuration
 
 ```javascript
-const { TraylinxAuthClient } = require('@traylinx/auth-client');
+const { TraylinxAuthClient } = require('traylinx-auth-client');
 
 const client = new TraylinxAuthClient(
     'your-client-id',
@@ -91,7 +91,7 @@ const client = new TraylinxAuthClient(
 #### Simple Function Approach
 
 ```javascript
-const { makeA2ARequest } = require('@traylinx/auth-client');
+const { makeA2ARequest } = require('traylinx-auth-client');
 
 // GET request
 const data = await makeA2ARequest('GET', 'https://other-agent.com/api/users');
@@ -112,7 +112,7 @@ const response = await makeA2ARequest('PUT', 'https://other-agent.com/api/update
 #### Manual Header Management
 
 ```javascript
-const { getAgentRequestHeaders } = require('@traylinx/auth-client');
+const { getAgentRequestHeaders } = require('traylinx-auth-client');
 const axios = require('axios');
 
 // Get headers for calling other agents
@@ -134,7 +134,7 @@ const response = await axios.get('https://other-agent.com/api/data', { headers }
 
 ```javascript
 const express = require('express');
-const { requireA2AAuth } = require('@traylinx/auth-client');
+const { requireA2AAuth } = require('traylinx-auth-client');
 
 const app = express();
 
@@ -152,7 +152,7 @@ app.post('/process', requireA2AAuth, (req, res) => {
 
 ```javascript
 const express = require('express');
-const { validateA2ARequest } = require('@traylinx/auth-client');
+const { validateA2ARequest } = require('traylinx-auth-client');
 
 const app = express();
 
@@ -174,7 +174,7 @@ app.post('/manual-validation', async (req, res) => {
 #### Dual Authentication Support (A2A + Bearer)
 
 ```javascript
-const { requireDualAuth, detectAuthMode } = require('@traylinx/auth-client');
+const { requireDualAuth, detectAuthMode } = require('traylinx-auth-client');
 
 app.get('/flexible-auth', requireDualAuth, (req, res) => {
     // Supports both Bearer tokens and custom headers
@@ -188,7 +188,7 @@ app.get('/flexible-auth', requireDualAuth, (req, res) => {
 ### Using the Client Directly
 
 ```javascript
-const { TraylinxAuthClient } = require('@traylinx/auth-client');
+const { TraylinxAuthClient } = require('traylinx-auth-client');
 
 // Create client with custom configuration
 const client = new TraylinxAuthClient(
@@ -219,7 +219,7 @@ const isValid = await client.validateToken('incoming-token', 'sender-agent-id');
 ### JSON-RPC Method Calls
 
 ```javascript
-const { TraylinxAuthClient } = require('@traylinx/auth-client');
+const { TraylinxAuthClient } = require('traylinx-auth-client');
 
 const client = new TraylinxAuthClient();
 
@@ -253,7 +253,7 @@ const {
     NetworkError,
     ValidationError,
     TokenExpiredError
-} = require('@traylinx/auth-client');
+} = require('traylinx-auth-client');
 
 try {
     const client = new TraylinxAuthClient(
@@ -289,7 +289,7 @@ try {
 ### Concurrent Usage
 
 ```javascript
-const { TraylinxAuthClient } = require('@traylinx/auth-client');
+const { TraylinxAuthClient } = require('traylinx-auth-client');
 
 // Thread-safe client usage
 const client = new TraylinxAuthClient();
@@ -640,7 +640,7 @@ const {
     AuthenticationError,    // Authentication failures  
     TokenExpiredError,      // Token expiration
     NetworkError           // Network/connectivity issues
-} = require('@traylinx/auth-client');
+} = require('traylinx-auth-client');
 ```
 
 ### Automatic Retry Logic
@@ -664,7 +664,7 @@ const {
 ### Production Monitoring
 
 ```javascript
-const { TraylinxAuthClient, NetworkError } = require('@traylinx/auth-client');
+const { TraylinxAuthClient, NetworkError } = require('traylinx-auth-client');
 
 const client = new TraylinxAuthClient();
 
@@ -1048,7 +1048,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 When reporting issues, please include:
 
 1. **Node.js version** and operating system
-2. **Library version** (`npm list @traylinx/auth-client`)
+2. **Library version** (`npm list traylinx-auth-client`)
 3. **Minimal code example** that reproduces the issue
 4. **Full error stack trace** if applicable
 5. **Expected vs actual behavior**
@@ -1075,5 +1075,5 @@ For security-related issues, please follow our [Security Policy](SECURITY.md):
 **Made with ❤️ by the Traylinx Team**
 
 [![GitHub stars](https://img.shields.io/github/stars/traylinx/traylinx-auth-client-js?style=social)](https://github.com/traylinx/traylinx-auth-client-js)
-[![npm downloads](https://img.shields.io/npm/dm/@traylinx/auth-client)](https://www.npmjs.com/package/@traylinx/auth-client)
+[![npm downloads](https://img.shields.io/npm/dm/traylinx-auth-client)](https://www.npmjs.com/package/traylinx-auth-client)
 [![GitHub contributors](https://img.shields.io/github/contributors/traylinx/traylinx-auth-client-js)](https://github.com/traylinx/traylinx-auth-client-js/graphs/contributors)

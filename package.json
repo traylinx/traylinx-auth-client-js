@@ -1,5 +1,5 @@
 {
-  "name": "@traylinx/auth-client",
+  "name": "traylinx-auth-client",
   "version": "1.0.1",
   "description": "Enterprise-grade authentication client with Agent-to-Agent (A2A) Protocol support for Traylinx Sentinel API and agent-to-agent communication",
   "main": "src/index.js",
