@@ -1,6 +1,6 @@
 /**
  * Comprehensive test suite for Joi validation module.
- * 
+ *
  * Tests all validation rules, edge cases, and error scenarios
  * to ensure robust input validation.
  */
@@ -28,10 +28,10 @@ describe('Configuration Validation', () => {
                 cacheTokens: true,
                 logLevel: 'INFO'
             };
-            
+
             const result = validateConfig(validConfig);
-            
-            expect(result).toEqual(validConfig);
+
+            expect(result).toEqual({...validConfig, agentTokenTtlSeconds:null, refreshSkewSeconds:30});
             expect(result.clientId).toBe('test-client-123');
             expect(result.timeout).toBe(30000);
             expect(result.cacheTokens).toBe(true);
@@ -44,9 +44,9 @@ describe('Configuration Validation', () => {
                 apiBaseUrl: 'https://api.example.com',
                 agentUserId: '12345678-1234-1234-1234-123456789abc'
             };
-            
+
             const result = validateConfig(minimalConfig);
-            
+
             expect(result.timeout).toBe(30000);
             expect(result.maxRetries).toBe(3);
             expect(result.retryDelay).toBe(1000);
@@ -63,9 +63,9 @@ describe('Configuration Validation', () => {
                 unknownProperty: 'should-be-removed',
                 anotherUnknown: 123
             };
-            
+
             const result = validateConfig(configWithExtra);
-            
+
             expect(result.unknownProperty).toBeUndefined();
             expect(result.anotherUnknown).toBeUndefined();
             expect(result.clientId).toBe('test-client');
@@ -78,9 +78,9 @@ describe('Configuration Validation', () => {
                 apiBaseUrl: 'https://api.example.com/',
                 agentUserId: '12345678-1234-1234-1234-123456789abc'
             };
-            
+
             const result = validateConfig(config);
-            
+
             expect(result.apiBaseUrl).toBe('https://api.example.com');
         });
 
@@ -91,9 +91,9 @@ describe('Configuration Validation', () => {
                 apiBaseUrl: 'https://api.example.com',
                 agentUserId: '12345678123412341234123456789ABC'
             };
-            
+
             const result = validateConfig(config);
-            
+
             expect(result.agentUserId).toBe('12345678-1234-1234-1234-123456789abc');
         });
 
@@ -105,9 +105,9 @@ describe('Configuration Validation', () => {
                 agentUserId: '12345678-1234-1234-1234-123456789abc',
                 logLevel: 'debug'
             };
-            
+
             const result = validateConfig(config);
-            
+
             expect(result.logLevel).toBe('DEBUG');
         });
     });
@@ -127,7 +127,7 @@ describe('Configuration Validation', () => {
                 'ABC-123_def',
                 '123'
             ];
-            
+
             validIds.forEach(clientId => {
                 const config = { ...baseConfig, clientId };
                 expect(() => validateConfig(config)).not.toThrow();
@@ -142,7 +142,7 @@ describe('Configuration Validation', () => {
                 'client#123',      // Contains #
                 'client+123'       // Contains +
             ];
-            
+
             invalidIds.forEach(clientId => {
                 const config = { ...baseConfig, clientId };
                 expect(() => validateConfig(config)).toThrow(/Client ID must contain only alphanumeric/);
@@ -183,7 +183,7 @@ describe('Configuration Validation', () => {
                 'complex!@#$%^&*()secret',
                 'very-long-secret-' + 'x'.repeat(50)
             ];
-            
+
             validSecrets.forEach(clientSecret => {
                 const config = { ...baseConfig, clientSecret };
                 expect(() => validateConfig(config)).not.toThrow();
@@ -202,7 +202,7 @@ describe('Configuration Validation', () => {
 
         it('should reject common weak secrets', () => {
             const weakSecrets = ['password', 'secret', '123456', 'admin'];
-            
+
             weakSecrets.forEach(clientSecret => {
                 const config = { ...baseConfig, clientSecret };
                 expect(() => validateConfig(config)).toThrow(/Client secret appears to be a common weak value/);
@@ -234,7 +234,7 @@ describe('Configuration Validation', () => {
                 'https://api.example.com/path',
                 'https://192.168.1.1:8443'
             ];
-            
+
             validUrls.forEach(apiBaseUrl => {
                 const config = { ...baseConfig, apiBaseUrl };
                 expect(() => validateConfig(config)).not.toThrow();
@@ -254,7 +254,7 @@ describe('Configuration Validation', () => {
                 'https://',
                 'https://.'
             ];
-            
+
             invalidUrls.forEach(apiBaseUrl => {
                 const config = { ...baseConfig, apiBaseUrl };
                 expect(() => validateConfig(config)).toThrow(/API base URL must be a valid HTTPS URL/);
@@ -280,7 +280,7 @@ describe('Configuration Validation', () => {
                 '00000000-0000-0000-0000-000000000000',
                 'ffffffff-ffff-ffff-ffff-ffffffffffff'
             ];
-            
+
             validUuids.forEach(agentUserId => {
                 const config = { ...baseConfig, agentUserId };
                 const result = validateConfig(config);
@@ -289,7 +289,7 @@ describe('Configuration Validation', () => {
         });
 
         it('should normalize UUID to lowercase with hyphens', () => {
-            const config = { ...baseConfig, agentUserId: 'ABCDEF123456789012345678901234567890' };
+            const config = { ...baseConfig, agentUserId: 'ABCDEF12345678901234567890123456' };
             const result = validateConfig(config);
             expect(result.agentUserId).toBe('abcdef12-3456-7890-1234-567890123456');
         });
@@ -301,7 +301,7 @@ describe('Configuration Validation', () => {
                 '12345678-1234-1234-1234-123456789abcdef',  // too long
                 'gggggggg-1234-1234-1234-123456789abc'  // invalid hex characters
             ];
-            
+
             invalidUuids.forEach(agentUserId => {
                 const config = { ...baseConfig, agentUserId };
                 expect(() => validateConfig(config)).toThrow(/Agent User ID must be a valid UUID/);
@@ -324,7 +324,7 @@ describe('Configuration Validation', () => {
         describe('timeout validation', () => {
             it('should accept valid timeout values', () => {
                 const validTimeouts = [1000, 30000, 60000, 300000];
-                
+
                 validTimeouts.forEach(timeout => {
                     const config = { ...baseConfig, timeout };
                     expect(() => validateConfig(config)).not.toThrow();
@@ -355,7 +355,7 @@ describe('Configuration Validation', () => {
         describe('maxRetries validation', () => {
             it('should accept valid maxRetries values', () => {
                 const validRetries = [0, 1, 3, 5, 10];
-                
+
                 validRetries.forEach(maxRetries => {
                     const config = { ...baseConfig, maxRetries };
                     expect(() => validateConfig(config)).not.toThrow();
@@ -381,7 +381,7 @@ describe('Configuration Validation', () => {
         describe('retryDelay validation', () => {
             it('should accept valid retryDelay values', () => {
                 const validDelays = [100, 1000, 5000, 60000];
-                
+
                 validDelays.forEach(retryDelay => {
                     const config = { ...baseConfig, retryDelay };
                     expect(() => validateConfig(config)).not.toThrow();
@@ -432,7 +432,7 @@ describe('Configuration Validation', () => {
         describe('logLevel validation', () => {
             it('should accept valid log levels', () => {
                 const validLevels = ['DEBUG', 'INFO', 'WARN', 'WARNING', 'ERROR', 'CRITICAL'];
-                
+
                 validLevels.forEach(logLevel => {
                     const config = { ...baseConfig, logLevel };
                     expect(() => validateConfig(config)).not.toThrow();
@@ -447,7 +447,7 @@ describe('Configuration Validation', () => {
 
             it('should reject invalid log levels', () => {
                 const invalidLevels = ['TRACE', 'VERBOSE', 'FATAL', 'OFF', 'ALL'];
-                
+
                 invalidLevels.forEach(logLevel => {
                     const config = { ...baseConfig, logLevel };
                     expect(() => validateConfig(config)).toThrow(/Log level must be one of/);
@@ -466,9 +466,9 @@ describe('Configuration Validation', () => {
                 timeout: 500,  // Too small
                 maxRetries: -1  // Negative
             };
-            
+
             expect(() => validateConfig(invalidConfig)).toThrow();
-            
+
             try {
                 validateConfig(invalidConfig);
             } catch (error) {
@@ -512,7 +512,7 @@ describe('Configuration Validation', () => {
         it('should return normalized values for individual parameters', () => {
             const result1 = validateParameter('logLevel', 'debug');
             expect(result1).toBe('DEBUG');
-            
+
             const result2 = validateParameter('apiBaseUrl', 'https://example.com/');
             expect(result2).toBe('https://example.com');
         });
@@ -521,7 +521,7 @@ describe('Configuration Validation', () => {
     describe('getDefaultConfig', () => {
         it('should return configuration with default values', () => {
             const defaults = getDefaultConfig();
-            
+
             expect(defaults.timeout).toBe(30000);
             expect(defaults.maxRetries).toBe(3);
             expect(defaults.retryDelay).toBe(1000);
@@ -531,7 +531,7 @@ describe('Configuration Validation', () => {
 
         it('should not include required fields in defaults', () => {
             const defaults = getDefaultConfig();
-            
+
             expect(defaults.clientId).toBeUndefined();
             expect(defaults.clientSecret).toBeUndefined();
             expect(defaults.apiBaseUrl).toBeUndefined();
@@ -547,7 +547,7 @@ describe('Configuration Validation', () => {
                 apiBaseUrl: 'https://api.example.com',
                 agentUserId: '12345678-1234-1234-1234-123456789abc'
             };
-            
+
             const missing = getMissingRequiredFields(completeConfig);
             expect(missing).toEqual([]);
         });
@@ -557,7 +557,7 @@ describe('Configuration Validation', () => {
                 clientId: 'test-client',
                 apiBaseUrl: 'https://api.example.com'
             };
-            
+
             const missing = getMissingRequiredFields(incompleteConfig);
             expect(missing).toContain('clientSecret');
             expect(missing).toContain('agentUserId');
@@ -582,9 +582,9 @@ describe('Configuration Validation', () => {
                 apiBaseUrl: 'https://api.example.com',
                 agentUserId: '12345678-1234-1234-1234-123456789abc'
             };
-            
+
             const sanitized = sanitizeConfigForLogging(config);
-            
+
             expect(sanitized.clientSecret).toBe('***REDACTED***');
             expect(sanitized.clientId).toBe('test-client');
             expect(sanitized.apiBaseUrl).toBe('https://api.example.com');
@@ -596,9 +596,9 @@ describe('Configuration Validation', () => {
                 clientId: 'test-client',
                 apiBaseUrl: 'https://api.example.com'
             };
-            
+
             const sanitized = sanitizeConfigForLogging(config);
-            
+
             expect(sanitized.clientSecret).toBeUndefined();
             expect(sanitized.clientId).toBe('test-client');
         });
@@ -608,9 +608,9 @@ describe('Configuration Validation', () => {
                 clientId: 'test-client',
                 clientSecret: 'super-secret-key'
             };
-            
+
             const sanitized = sanitizeConfigForLogging(config);
-            
+
             expect(config.clientSecret).toBe('super-secret-key');
             expect(sanitized.clientSecret).toBe('***REDACTED***');
         });

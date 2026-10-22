@@ -2,8 +2,9 @@ const request = require('supertest');
 const express = require('express');
 
 // Mock uuid
-jest.mock('uuid', () => ({
-    v4: jest.fn(() => 'test-uuid-1234')
+jest.mock('node:crypto', () => ({
+    ...jest.requireActual('node:crypto'),
+    randomUUID: jest.fn(() => 'test-uuid-1234')
 }));
 
 // Mock axios
@@ -40,11 +41,11 @@ jest.mock('../src/client', () => {
     });
 });
 
-const { 
-    getRequestHeaders, 
+const {
+    getRequestHeaders,
     getAgentRequestHeaders,
     validateA2ARequest,
-    requireA2AAuth, 
+    requireA2AAuth,
     detectAuthMode,
     validateDualAuthRequest,
     requireDualAuth
@@ -62,7 +63,7 @@ describe('Index Module Functions', () => {
                 'X-Agent-Secret-Token': 'test_agent_secret_token',
                 'X-Agent-User-Id': 'test_user_id',
             };
-            
+
             mockGetRequestHeaders.mockResolvedValue(expectedHeaders);
 
             const headers = await getRequestHeaders();
@@ -84,7 +85,7 @@ describe('Index Module Functions', () => {
                 'X-Agent-Secret-Token': 'test_agent_secret_token',
                 'X-Agent-User-Id': 'test_user_id',
             };
-            
+
             mockGetAgentRequestHeaders.mockResolvedValue(expectedHeaders);
 
             const headers = await getAgentRequestHeaders();
@@ -100,7 +101,7 @@ describe('Index Module Functions', () => {
                 'x-agent-secret-token': 'valid_token',
                 'x-agent-user-id': 'test_user'
             };
-            
+
             mockValidateToken.mockResolvedValue(true);
 
             const isValid = await validateA2ARequest(headers);
@@ -144,7 +145,7 @@ describe('Index Module Functions', () => {
             const headers = {
                 'Authorization': 'Bearer test_token'
             };
-            
+
             mockDetectAuthMode.mockReturnValue('bearer');
 
             const mode = detectAuthMode(headers);
@@ -160,7 +161,7 @@ describe('Index Module Functions', () => {
                 'Authorization': 'Bearer test_token',
                 'X-Agent-User-Id': 'test_user'
             };
-            
+
             mockValidateA2ARequest.mockResolvedValue(true);
 
             const isValid = await validateDualAuthRequest(headers);
@@ -219,14 +220,14 @@ describe('Express Middleware', () => {
                 .get('/protected')
                 .set('x-agent-secret-token', 'valid_token')
                 .set('x-agent-user-id', 'test_user')
-                .expect(500, { error: 'Internal server error' });
+                .expect(503, { error: 'Authentication service unavailable' });
         });
     });
 
     describe('requireDualAuth', () => {
         beforeEach(() => {
             app.get('/protected', requireDualAuth, (req, res) => {
-                res.status(200).json({ 
+                res.status(200).json({
                     message: 'ok',
                     authMode: req.authMode
                 });
@@ -266,7 +267,22 @@ describe('Express Middleware', () => {
                 .get('/protected')
                 .set('Authorization', 'Bearer valid_token')
                 .set('X-Agent-User-Id', 'test_user')
-                .expect(500, { error: 'Internal server error' });
+                .expect(503, { error: 'Authentication service unavailable' });
         });
     });
+});
+describe('Raw credential header ambiguity', () => {
+ test.each([requireA2AAuth, requireDualAuth])('duplicate raw Authorization is rejected before validation',async middleware=>{
+  jest.clearAllMocks();
+  const req={headers:{authorization:'Bearer first','x-agent-user-id':'id'},rawHeaders:['Authorization','Bearer first','authorization','Bearer second']};
+  const res={status:jest.fn().mockReturnThis(),json:jest.fn()};const next=jest.fn();
+  await middleware(req,res,next);
+  expect(res.status).toHaveBeenCalledWith(401);expect(next).not.toHaveBeenCalled();
+  expect(mockValidateToken).not.toHaveBeenCalled();expect(mockValidateA2ARequest).not.toHaveBeenCalled();
+ });
+ test('single raw credentials and unrelated duplicate headers accepted by parser',async()=>{
+  mockValidateA2ARequest.mockResolvedValue(true);
+  const req={headers:{},rawHeaders:['Accept','one','Accept','two','Authorization','Bearer first','X-Agent-User-Id','id']};
+  const next=jest.fn();await requireDualAuth(req,{},next);expect(next).toHaveBeenCalled();
+ });
 });

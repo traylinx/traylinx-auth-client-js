@@ -2,6 +2,7 @@
 // Please use the TraylinxAuthClient class in client.js instead.
 
 const axios = require('axios');
+const { deadlineSignal, destination, tokenState, AUTH_RESPONSE } = require('./security');
 
 class TokenManager {
     constructor() {
@@ -12,47 +13,44 @@ class TokenManager {
         this.accessToken = null;
         this.agentSecretToken = null;
         this.tokenExpiration = null;
+        this.agentTokenExpiration = 0;
         this._fetchPromise = null; // For handling concurrent requests
     }
-    
+
     _validateConfig() {
-        if (!this.clientId || !this.clientSecret || !this.apiBaseUrl || 
+        if (!this.clientId || !this.clientSecret || !this.apiBaseUrl ||
             this.clientId.trim() === '' || this.clientSecret.trim() === '' || this.apiBaseUrl.trim() === '') {
             throw new Error('Missing required environment variables: TRAYLINX_CLIENT_ID, TRAYLINX_CLIENT_SECRET, TRAYLINX_API_BASE_URL');
         }
     }
 
     async _fetchTokens() {
+        const bound = deadlineSignal(30000);
         try {
             // Validate configuration before making request
             this._validateConfig();
-            
+            destination(this.apiBaseUrl, true);
+            const started = Date.now();
+
             const response = await axios.post(`${this.apiBaseUrl}/oauth/token`, new URLSearchParams({
                 grant_type: 'client_credentials',
                 client_id: this.clientId,
                 client_secret: this.clientSecret,
                 scope: 'a2a',
             }), {
+                signal: bound.signal, timeout: 30000, maxRedirects: 0, maxContentLength: AUTH_RESPONSE, maxBodyLength: AUTH_RESPONSE,
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
             });
 
-            const { access_token, agent_secret_token, expires_in } = response.data;
-            
-            // Validate response structure
-            if (!access_token || !agent_secret_token || expires_in === undefined) {
-                throw new Error('Invalid token response: missing required fields');
-            }
-            
-            this.accessToken = access_token;
-            this.agentSecretToken = agent_secret_token;
-            this.tokenExpiration = Date.now() + (expires_in * 1000);
+            Object.assign(this, tokenState(response.data, started));
         } catch (error) {
-            console.error('Error fetching tokens:', error.message);
+            this.accessToken = this.agentSecretToken = null;
+            this.tokenExpiration = this.agentTokenExpiration = 0;
             throw new Error('Could not fetch tokens from Traylinx Sentinel');
         } finally {
-            this._fetchPromise = null; // Clear the promise after completion
+            bound.cleanup();
         }
     }
 
@@ -60,7 +58,7 @@ class TokenManager {
         if (!this.accessToken || Date.now() >= this.tokenExpiration) {
             // Handle concurrent requests by reusing the same promise
             if (!this._fetchPromise) {
-                this._fetchPromise = this._fetchTokens();
+                this._fetchPromise = this._fetchTokens().finally(() => { this._fetchPromise = null; });
             }
             await this._fetchPromise;
         }
@@ -68,10 +66,10 @@ class TokenManager {
     }
 
     async getAgentSecretToken() {
-        if (!this.agentSecretToken || Date.now() >= this.tokenExpiration) {
+        if (!this.agentSecretToken || Date.now() >= this.agentTokenExpiration) {
             // Handle concurrent requests by reusing the same promise
             if (!this._fetchPromise) {
-                this._fetchPromise = this._fetchTokens();
+                this._fetchPromise = this._fetchTokens().finally(() => { this._fetchPromise = null; });
             }
             await this._fetchPromise;
         }

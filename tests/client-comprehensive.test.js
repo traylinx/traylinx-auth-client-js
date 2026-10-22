@@ -3,8 +3,9 @@
  */
 
 // Mock dependencies first
-jest.mock('uuid', () => ({
-    v4: jest.fn(() => 'test-uuid-1234')
+jest.mock('node:crypto', () => ({
+    ...jest.requireActual('node:crypto'),
+    randomUUID: jest.fn(() => 'test-uuid-1234')
 }));
 
 jest.mock('axios', () => ({
@@ -19,7 +20,7 @@ jest.mock('axios', () => ({
 }));
 
 const axios = require('axios');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('node:crypto');
 
 describe('TraylinxAuthClient - Comprehensive Coverage', () => {
     let TraylinxAuthClient;
@@ -32,7 +33,7 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        
+
         mockAxiosInstance = {
             post: jest.fn(),
             interceptors: {
@@ -41,7 +42,7 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                 }
             }
         };
-        
+
         axios.create.mockReturnValue(mockAxiosInstance);
     });
 
@@ -63,7 +64,7 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                     data: {
                         access_token: 'test_access_token',
                         agent_secret_token: 'test_agent_secret_token',
-                        expires_in: 3600
+                        agent_secret_token_expires_in: 3600, expires_in: 3600
                     }
                 });
 
@@ -82,7 +83,7 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                     }
                 });
 
-                await expect(client._fetchTokens()).rejects.toThrow('Invalid token response: missing fields agent_secret_token, expires_in');
+                await expect(client._fetchTokens()).rejects.toThrow('Invalid token response');
             });
 
             it('should handle network errors during token fetch', async () => {
@@ -109,7 +110,8 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
         describe('getAccessToken', () => {
             it('should return cached token if valid', async () => {
                 client.accessToken = 'cached_token';
-                client.tokenExpiration = Date.now() + 3600000; // 1 hour from now
+                client.tokenExpiration = Date.now() + 3600000;
+                client.agentTokenExpiration = client.tokenExpiration; // 1 hour from now
 
                 const token = await client.getAccessToken();
                 expect(token).toBe('cached_token');
@@ -124,7 +126,7 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                     data: {
                         access_token: 'new_access_token',
                         agent_secret_token: 'new_agent_secret_token',
-                        expires_in: 3600
+                        agent_secret_token_expires_in: 3600, expires_in: 3600
                     }
                 });
 
@@ -137,19 +139,20 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                 mockAxiosInstance.post.mockResolvedValue({
                     data: {
                         agent_secret_token: 'test_agent_secret_token',
-                        expires_in: 3600
+                        agent_secret_token_expires_in: 3600, expires_in: 3600
                         // Missing access_token
                     }
                 });
 
-                await expect(client.getAccessToken()).rejects.toThrow('Invalid token response: missing fields access_token');
+                await expect(client.getAccessToken()).rejects.toThrow('Invalid token response');
             });
         });
 
         describe('getAgentSecretToken', () => {
             it('should return cached token if valid', async () => {
                 client.agentSecretToken = 'cached_agent_token';
-                client.tokenExpiration = Date.now() + 3600000; // 1 hour from now
+                client.tokenExpiration = Date.now() + 3600000;
+                client.agentTokenExpiration = client.tokenExpiration; // 1 hour from now
 
                 const token = await client.getAgentSecretToken();
                 expect(token).toBe('cached_agent_token');
@@ -164,7 +167,7 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                     data: {
                         access_token: 'new_access_token',
                         agent_secret_token: 'new_agent_secret_token',
-                        expires_in: 3600
+                        agent_secret_token_expires_in: 3600, expires_in: 3600
                     }
                 });
 
@@ -177,12 +180,12 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                 mockAxiosInstance.post.mockResolvedValue({
                     data: {
                         access_token: 'test_access_token',
-                        expires_in: 3600
+                        agent_secret_token_expires_in: 3600, expires_in: 3600
                         // Missing agent_secret_token
                     }
                 });
 
-                await expect(client.getAgentSecretToken()).rejects.toThrow('Invalid token response: missing fields agent_secret_token');
+                await expect(client.getAgentSecretToken()).rejects.toThrow('Invalid token response');
             });
         });
     });
@@ -203,7 +206,7 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                 data: {
                     access_token: 'test_access_token',
                     agent_secret_token: 'test_agent_secret_token',
-                    expires_in: 3600
+                    agent_secret_token_expires_in: 3600, expires_in: 3600
                 }
             });
         });
@@ -259,7 +262,7 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                 data: {
                     access_token: 'test_access_token',
                     agent_secret_token: 'test_agent_secret_token',
-                    expires_in: 3600
+                    agent_secret_token_expires_in: 3600, expires_in: 3600
                 }
             });
         });
@@ -268,7 +271,7 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
             it('should validate token successfully', async () => {
                 mockAxiosInstance.post.mockResolvedValueOnce({
                     status: 200,
-                    data: { active: true }
+                    data: { active:true, agent_id:'test_user_id', scopes:'a2a', expires_at:Date.now()/1000+60 }
                 });
 
                 const isValid = await client.validateToken('test_token', 'test_user_id');
@@ -295,7 +298,7 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                     data: null
                 });
 
-                await expect(client.validateToken('test_token', 'test_user_id')).rejects.toThrow('Failed to parse token validation response');
+                await expect(client.validateToken('test_token', 'test_user_id')).resolves.toBe(false);
             });
 
             it('should handle 401 error during validation', async () => {
@@ -417,7 +420,7 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                 data: {
                     access_token: 'test_access_token',
                     agent_secret_token: 'test_agent_secret_token',
-                    expires_in: 3600
+                    agent_secret_token_expires_in: 3600, expires_in: 3600
                 }
             });
         });
@@ -500,7 +503,7 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                     }
                 });
 
-                await expect(client.rpcCall('test_method', {})).rejects.toThrow('Invalid RPC request: Invalid Request');
+                await expect(client.rpcCall('test_method', {})).rejects.toThrow('Invalid RPC request: RPC call failed');
             });
 
             it('should handle method not found error', async () => {
@@ -515,7 +518,7 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                     }
                 });
 
-                await expect(client.rpcCall('unknown_method', {})).rejects.toThrow("RPC method 'unknown_method' not found: Method not found");
+                await expect(client.rpcCall('unknown_method', {})).rejects.toThrow("RPC method not found: RPC call failed");
             });
 
             it('should handle invalid params error', async () => {
@@ -530,7 +533,7 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                     }
                 });
 
-                await expect(client.rpcCall('test_method', {})).rejects.toThrow('Invalid RPC parameters: Invalid params');
+                await expect(client.rpcCall('test_method', {})).rejects.toThrow('Invalid RPC parameters: RPC call failed');
             });
 
             it('should handle generic RPC errors', async () => {
@@ -545,7 +548,7 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                     }
                 });
 
-                await expect(client.rpcCall('test_method', {})).rejects.toThrow('RPC error (-32000): Server error');
+                await expect(client.rpcCall('test_method', {})).rejects.toThrow('RPC call failed');
             });
 
             it('should handle malformed RPC response', async () => {
@@ -619,9 +622,9 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                 headers: {
                     'User-Agent': 'TraylinxAuthClient-JS/1.0.0'
                 },
-                maxRedirects: 5,
-                maxContentLength: 50 * 1024 * 1024,
-                maxBodyLength: 50 * 1024 * 1024
+                maxRedirects: 0,
+                maxContentLength: 4 * 1024 * 1024,
+                maxBodyLength: 4 * 1024 * 1024
             });
         });
 
@@ -645,7 +648,7 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
         describe('_handleRequestError edge cases', () => {
             it('should handle ECONNRESET errors', () => {
                 const error = { code: 'ECONNRESET' };
-                
+
                 expect(() => {
                     client._handleRequestError(error, 'test operation');
                 }).toThrow('Connection reset during test operation');
@@ -659,10 +662,10 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                         data: { message: 'Invalid request format' }
                     }
                 };
-                
+
                 expect(() => {
                     client._handleRequestError(error, 'test operation');
-                }).toThrow('HTTP error (400) during test operation: Invalid request format');
+                }).toThrow('HTTP error (400) during test operation');
             });
 
             it('should handle HTTP errors with response data error field', () => {
@@ -673,10 +676,10 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                         data: { error: 'Validation failed' }
                     }
                 };
-                
+
                 expect(() => {
                     client._handleRequestError(error, 'test operation');
-                }).toThrow('HTTP error (422) during test operation: Validation failed');
+                }).toThrow('HTTP error (422) during test operation');
             });
 
             it('should handle HTTP errors with only statusText', () => {
@@ -687,10 +690,10 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                         data: {}
                     }
                 };
-                
+
                 expect(() => {
                     client._handleRequestError(error, 'test operation');
-                }).toThrow('HTTP error (404) during test operation: Not Found');
+                }).toThrow('HTTP error (404) during test operation');
             });
 
             it('should handle HTTP errors with no error details', () => {
@@ -701,10 +704,10 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                         data: {}
                     }
                 };
-                
+
                 expect(() => {
                     client._handleRequestError(error, 'test operation');
-                }).toThrow('HTTP error (418) during test operation: Unknown error');
+                }).toThrow('HTTP error (418) during test operation');
             });
         });
 
@@ -715,7 +718,7 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                     data: {
                         access_token: 'test_access_token',
                         agent_secret_token: 'test_agent_secret_token',
-                        expires_in: 3600
+                        agent_secret_token_expires_in: 3600, expires_in: 3600
                     }
                 });
             });
@@ -753,7 +756,7 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
             it('should return response as-is on success', async () => {
                 const successHandler = mockAxiosInstance.interceptors.response.use.mock.calls[0][0];
                 const mockResponse = { data: { success: true } };
-                
+
                 const result = successHandler(mockResponse);
                 expect(result).toBe(mockResponse);
             });
@@ -763,9 +766,9 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                     config: {},
                     code: 'ECONNABORTED'
                 };
-                
+
                 client._shouldRetry = jest.fn().mockReturnValue(false);
-                
+
                 try {
                     await interceptorFunction(error);
                 } catch (e) {
@@ -778,9 +781,9 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                     config: { __retryCount: 0 },
                     code: 'ECONNABORTED'
                 };
-                
+
                 client._shouldRetry = jest.fn().mockReturnValue(false);
-                
+
                 await expect(interceptorFunction(error)).rejects.toBe(error);
                 expect(client._shouldRetry).toHaveBeenCalledWith(error, error.config);
             });
@@ -790,10 +793,10 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                     config: { __retryCount: 5 },
                     code: 'ECONNABORTED'
                 };
-                
+
                 client._shouldRetry = jest.fn().mockReturnValue(true);
                 client.config.maxRetries = 3;
-                
+
                 await expect(interceptorFunction(error)).rejects.toBe(error);
             });
 
@@ -802,26 +805,26 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                     config: { __retryCount: 0 },
                     code: 'ECONNABORTED'
                 };
-                
+
                 client._shouldRetry = jest.fn().mockReturnValue(true);
                 client._calculateRetryDelay = jest.fn().mockReturnValue(100);
                 client._sleep = jest.fn().mockResolvedValue();
                 client.config.maxRetries = 3;
-                
+
                 // Create a mock function for the axios instance
                 const mockRetryResponse = { data: { success: true } };
                 const mockAxiosCall = jest.fn().mockResolvedValue(mockRetryResponse);
-                
+
                 // Replace the instance function in the interceptor context
                 const modifiedInterceptorFunction = async (error) => {
                     const config = error.config;
-                    
+
                     if (!config.__retryCount) {
                         config.__retryCount = 0;
                     }
 
                     const shouldRetry = client._shouldRetry(error, config);
-                    
+
                     if (shouldRetry && config.__retryCount < client.config.maxRetries) {
                         config.__retryCount++;
                         const delay = client._calculateRetryDelay(config.__retryCount);
@@ -831,9 +834,9 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
 
                     return Promise.reject(error);
                 };
-                
+
                 const result = await modifiedInterceptorFunction(error);
-                
+
                 expect(error.config.__retryCount).toBe(1);
                 expect(client._calculateRetryDelay).toHaveBeenCalledWith(1);
                 expect(client._sleep).toHaveBeenCalledWith(100);
@@ -849,7 +852,7 @@ describe('TraylinxAuthClient - Comprehensive Coverage', () => {
                     data: {
                         access_token: 'test_access_token',
                         agent_secret_token: 'test_agent_secret_token',
-                        expires_in: 3600
+                        agent_secret_token_expires_in: 3600, expires_in: 3600
                     }
                 });
             });

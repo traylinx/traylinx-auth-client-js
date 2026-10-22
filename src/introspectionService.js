@@ -2,6 +2,7 @@
 // Please use the TraylinxAuthClient class in client.js instead.
 
 const axios = require('axios');
+const { deadlineSignal, destination, credential, validIntrospection, AUTH_RESPONSE } = require('./security');
 
 class IntrospectionService {
     constructor(tokenManager) {
@@ -10,7 +11,10 @@ class IntrospectionService {
 
     async validateToken(agentSecretToken, agentUserId) {
         const apiBaseUrl = process.env.TRAYLINX_API_BASE_URL;
+        const bound = deadlineSignal(30000);
         try {
+            destination(apiBaseUrl, true);
+            if (!credential(agentSecretToken) || !credential(agentUserId)) return false;
             const accessToken = await this.tokenManager.getAccessToken();
             const response = await axios.post(
                 `${apiBaseUrl}/oauth/agent/introspect`,
@@ -19,6 +23,7 @@ class IntrospectionService {
                     agent_user_id: agentUserId,
                 }),
                 {
+                    signal: bound.signal, timeout: 30000, maxRedirects: 0, maxContentLength: AUTH_RESPONSE, maxBodyLength: AUTH_RESPONSE,
                     headers: {
                         Authorization: `Bearer ${accessToken}`,
                         'Content-Type': 'application/x-www-form-urlencoded',
@@ -26,11 +31,11 @@ class IntrospectionService {
                 }
             );
 
-            return response.data.active === true;
+            return validIntrospection(response.data, agentUserId) === true;
         } catch (error) {
-            console.error('Error validating token:', error.message);
+            // Fail closed without logging transport objects or credentials.
             return false;
-        }
+        } finally { bound.cleanup(); }
     }
 }
 

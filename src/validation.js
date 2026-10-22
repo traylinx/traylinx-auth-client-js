@@ -1,11 +1,12 @@
 /**
  * Configuration validation module for TraylinxAuthClient.
- * 
+ *
  * This module provides comprehensive input validation using Joi
  * to ensure security and prevent runtime errors.
  */
 
 const Joi = require('joi');
+const { destination } = require('./security');
 
 /**
  * Configuration schema with comprehensive validation rules.
@@ -23,7 +24,7 @@ const configSchema = Joi.object({
             'string.max': 'Client ID must be no more than 100 characters long',
             'any.required': 'Client ID is required'
         }),
-    
+
     clientSecret: Joi.string()
         .min(10)
         .max(500)
@@ -43,14 +44,14 @@ const configSchema = Joi.object({
             'any.required': 'Client secret is required',
             'any.invalid': 'Client secret appears to be a common weak value'
         }),
-    
+
     apiBaseUrl: Joi.string()
         .uri({ scheme: ['https'] })
         .required()
         .custom((value, helpers) => {
             // Additional validation for edge cases
             try {
-                const url = new URL(value);
+                const url = destination(value, true);
                 // Check for invalid hostnames
                 if (!url.hostname || url.hostname === '.' || url.hostname === '') {
                     return helpers.error('string.uri');
@@ -58,7 +59,7 @@ const configSchema = Joi.object({
             } catch (e) {
                 return helpers.error('string.uri');
             }
-            
+
             // Remove trailing slash for consistency
             if (value.endsWith('/')) {
                 return value.slice(0, -1);
@@ -71,7 +72,7 @@ const configSchema = Joi.object({
             'string.uriCustomScheme': 'API base URL must be a valid HTTPS URL',
             'any.required': 'API base URL is required'
         }),
-    
+
     agentUserId: Joi.string()
         .required()
         .custom((value, helpers) => {
@@ -85,12 +86,12 @@ const configSchema = Joi.object({
             } else {
                 // Hex string without hyphens
                 const cleanUuid = value.toLowerCase();
-                
+
                 // Check if it's a valid hex string and has at least 32 characters
-                if (cleanUuid.length < 32 || !/^[0-9a-f]+$/i.test(cleanUuid)) {
+                if (cleanUuid.length !== 32 || !/^[0-9a-f]+$/i.test(cleanUuid)) {
                     return helpers.error('string.guid');
                 }
-                
+
                 // Take first 32 characters and format as UUID
                 const uuid32 = cleanUuid.slice(0, 32);
                 return `${uuid32.slice(0, 8)}-${uuid32.slice(8, 12)}-${uuid32.slice(12, 16)}-${uuid32.slice(16, 20)}-${uuid32.slice(20)}`;
@@ -101,7 +102,9 @@ const configSchema = Joi.object({
             'string.guid': 'Agent User ID must be a valid UUID',
             'any.required': 'Agent User ID is required'
         }),
-    
+
+    agentTokenTtlSeconds: Joi.number().strict().greater(0).max(2678400).allow(null).default(null),
+    refreshSkewSeconds: Joi.number().strict().min(0).max(300).default(30),
     timeout: Joi.number()
         .integer()
         .min(1000)
@@ -113,7 +116,7 @@ const configSchema = Joi.object({
             'number.min': 'Timeout must be at least 1000ms (1 second)',
             'number.max': 'Timeout must be no more than 300000ms (5 minutes)'
         }),
-    
+
     maxRetries: Joi.number()
         .integer()
         .min(0)
@@ -125,7 +128,7 @@ const configSchema = Joi.object({
             'number.min': 'Max retries cannot be negative',
             'number.max': 'Max retries must be no more than 10 to prevent excessive delays'
         }),
-    
+
     retryDelay: Joi.number()
         .min(100)
         .max(60000)
@@ -135,14 +138,14 @@ const configSchema = Joi.object({
             'number.min': 'Retry delay must be at least 100ms',
             'number.max': 'Retry delay must be no more than 60000ms (60 seconds)'
         }),
-    
+
     cacheTokens: Joi.boolean()
         .strict()
         .default(true)
         .messages({
             'boolean.base': 'Cache tokens must be a boolean value'
         }),
-    
+
     logLevel: Joi.string()
         .default('INFO')
         .custom((value, helpers) => {
@@ -164,7 +167,7 @@ const configSchema = Joi.object({
 
 /**
  * Validate configuration parameters.
- * 
+ *
  * @param {Object} config - Configuration object to validate
  * @returns {Object} Validated and normalized configuration
  * @throws {Error} If validation fails
@@ -173,20 +176,20 @@ function validateConfig(config) {
     if (config === null || config === undefined) {
         throw new Error('Configuration validation failed: Configuration cannot be null or undefined');
     }
-    
+
     const { error, value } = configSchema.validate(config);
-    
+
     if (error) {
         const errorMessages = error.details.map(detail => detail.message);
         throw new Error(`Configuration validation failed: ${errorMessages.join('; ')}`);
     }
-    
+
     return value;
 }
 
 /**
  * Validate individual configuration parameter.
- * 
+ *
  * @param {string} paramName - Name of the parameter to validate
  * @param {*} paramValue - Value to validate
  * @returns {*} Validated value
@@ -199,19 +202,19 @@ function validateParameter(paramName, paramValue) {
     } catch (error) {
         throw new Error(`Unknown configuration parameter: ${paramName}`);
     }
-    
+
     const { error: validationError, value } = paramSchema.validate(paramValue);
-    
+
     if (validationError) {
         throw new Error(`Parameter '${paramName}' validation failed: ${validationError.message}`);
     }
-    
+
     return value;
 }
 
 /**
  * Get default configuration values.
- * 
+ *
  * @returns {Object} Default configuration object
  */
 function getDefaultConfig() {
@@ -221,17 +224,17 @@ function getDefaultConfig() {
 
 /**
  * Check if a configuration object has all required fields.
- * 
+ *
  * @param {Object} config - Configuration object to check
  * @returns {Array<string>} Array of missing required field names
  */
 function getMissingRequiredFields(config) {
     const { error } = configSchema.validate(config);
-    
+
     if (!error) {
         return [];
     }
-    
+
     return error.details
         .filter(detail => detail.type === 'any.required')
         .map(detail => detail.path[0]);
@@ -239,18 +242,18 @@ function getMissingRequiredFields(config) {
 
 /**
  * Sanitize configuration for logging (removes sensitive data).
- * 
+ *
  * @param {Object} config - Configuration object to sanitize
  * @returns {Object} Sanitized configuration safe for logging
  */
 function sanitizeConfigForLogging(config) {
     const sanitized = { ...config };
-    
+
     // Remove or mask sensitive fields
     if (sanitized.clientSecret) {
         sanitized.clientSecret = '***REDACTED***';
     }
-    
+
     return sanitized;
 }
 

@@ -3,8 +3,9 @@
  */
 
 // Mock dependencies first
-jest.mock('uuid', () => ({
-    v4: jest.fn(() => 'test-uuid-1234')
+jest.mock('node:crypto', () => ({
+    ...jest.requireActual('node:crypto'),
+    randomUUID: jest.fn(() => 'test-uuid-1234')
 }));
 
 jest.mock('axios', () => ({
@@ -31,7 +32,7 @@ describe('TraylinxAuthClient - Core Functionality', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        
+
         mockAxiosInstance = {
             post: jest.fn(),
             interceptors: {
@@ -40,7 +41,7 @@ describe('TraylinxAuthClient - Core Functionality', () => {
                 }
             }
         };
-        
+
         axios.create.mockReturnValue(mockAxiosInstance);
     });
 
@@ -52,7 +53,7 @@ describe('TraylinxAuthClient - Core Functionality', () => {
                 'https://api.example.com',
                 '12345678-1234-1234-1234-123456789abc'
             );
-            
+
             expect(client.clientId).toBe('test-client-123');
             expect(client.clientSecret).toBe('super-secret-key-12345');
             expect(client.apiBaseUrl).toBe('https://api.example.com');
@@ -70,14 +71,14 @@ describe('TraylinxAuthClient - Core Functionality', () => {
             process.env.TRAYLINX_CLIENT_SECRET = 'env-client-secret-12345';
             process.env.TRAYLINX_API_BASE_URL = 'https://env.example.com';
             process.env.TRAYLINX_AGENT_USER_ID = '87654321-4321-4321-4321-210987654321';
-            
+
             const client = new TraylinxAuthClient();
-            
+
             expect(client.clientId).toBe('env-client-id');
             expect(client.clientSecret).toBe('env-client-secret-12345');
             expect(client.apiBaseUrl).toBe('https://env.example.com');
             expect(client.agentUserId).toBe('87654321-4321-4321-4321-210987654321');
-            
+
             // Clean up
             delete process.env.TRAYLINX_CLIENT_ID;
             delete process.env.TRAYLINX_CLIENT_SECRET;
@@ -95,7 +96,7 @@ describe('TraylinxAuthClient - Core Functionality', () => {
                 cacheTokens: false,
                 logLevel: 'DEBUG'
             };
-            
+
             const client = new TraylinxAuthClient(
                 'test-client',
                 'super-secret-key-12345',
@@ -103,7 +104,7 @@ describe('TraylinxAuthClient - Core Functionality', () => {
                 '12345678-1234-1234-1234-123456789abc',
                 options
             );
-            
+
             expect(client.config.timeout).toBe(60000);
             expect(client.config.maxRetries).toBe(5);
             expect(client.config.retryDelay).toBe(2000);
@@ -118,7 +119,7 @@ describe('TraylinxAuthClient - Core Functionality', () => {
                 'https://api.example.com',
                 '12345678-1234-1234-1234-123456789abc'
             );
-            
+
             expect(client.config.timeout).toBe(30000);
             expect(client.config.maxRetries).toBe(3);
             expect(client.config.retryDelay).toBe(1000);
@@ -143,30 +144,30 @@ describe('TraylinxAuthClient - Core Functionality', () => {
         describe('_shouldRetry', () => {
             it('should retry on network errors', () => {
                 const networkErrors = ['ECONNABORTED', 'ENOTFOUND', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT'];
-                
+
                 networkErrors.forEach(code => {
                     const error = { code };
-                    const config = { __retryCount: 0 };
+                    const config = { __retryCount: 0, method: 'GET' };
                     expect(client._shouldRetry(error, config)).toBe(true);
                 });
             });
 
             it('should retry on retryable HTTP status codes', () => {
                 const retryableStatuses = [429, 500, 502, 503, 504];
-                
+
                 retryableStatuses.forEach(status => {
                     const error = { response: { status } };
-                    const config = { __retryCount: 0 };
+                    const config = { __retryCount: 0, method: 'GET' };
                     expect(client._shouldRetry(error, config)).toBe(true);
                 });
             });
 
             it('should not retry on non-retryable HTTP status codes', () => {
                 const nonRetryableStatuses = [400, 401, 403, 404];
-                
+
                 nonRetryableStatuses.forEach(status => {
                     const error = { response: { status } };
-                    const config = { __retryCount: 0 };
+                    const config = { __retryCount: 0, method: 'GET' };
                     expect(client._shouldRetry(error, config)).toBe(false);
                 });
             });
@@ -174,7 +175,7 @@ describe('TraylinxAuthClient - Core Functionality', () => {
             it('should not retry if maxRetries is 0', () => {
                 client.config.maxRetries = 0;
                 const error = { code: 'ECONNABORTED' };
-                const config = { __retryCount: 0 };
+                const config = { __retryCount: 0, method: 'GET' };
                 expect(client._shouldRetry(error, config)).toBe(false);
             });
         });
@@ -182,11 +183,11 @@ describe('TraylinxAuthClient - Core Functionality', () => {
         describe('_calculateRetryDelay', () => {
             it('should calculate exponential backoff delay', () => {
                 client.config.retryDelay = 1000;
-                
+
                 const delay1 = client._calculateRetryDelay(1);
                 const delay2 = client._calculateRetryDelay(2);
                 const delay3 = client._calculateRetryDelay(3);
-                
+
                 expect(delay1).toBeGreaterThanOrEqual(1000);
                 expect(delay1).toBeLessThan(1200); // With 10% jitter
                 expect(delay2).toBeGreaterThanOrEqual(2000);
@@ -197,7 +198,7 @@ describe('TraylinxAuthClient - Core Functionality', () => {
 
             it('should cap delay at 30 seconds', () => {
                 client.config.retryDelay = 10000;
-                
+
                 const delay = client._calculateRetryDelay(10); // Would be very large without cap
                 expect(delay).toBeLessThanOrEqual(30000);
             });
@@ -208,7 +209,7 @@ describe('TraylinxAuthClient - Core Functionality', () => {
                 const start = Date.now();
                 await client._sleep(50); // Reduced sleep time for faster tests
                 const end = Date.now();
-                
+
                 expect(end - start).toBeGreaterThanOrEqual(40); // Allow some variance
                 expect(end - start).toBeLessThan(150); // More generous upper bound
             });
@@ -230,7 +231,7 @@ describe('TraylinxAuthClient - Core Functionality', () => {
         describe('_handleRequestError', () => {
             it('should handle timeout errors', () => {
                 const error = { code: 'ECONNABORTED' };
-                
+
                 expect(() => {
                     client._handleRequestError(error, 'test operation');
                 }).toThrow('Request timeout during test operation');
@@ -238,7 +239,7 @@ describe('TraylinxAuthClient - Core Functionality', () => {
 
             it('should handle DNS errors', () => {
                 const error = { code: 'ENOTFOUND' };
-                
+
                 expect(() => {
                     client._handleRequestError(error, 'test operation');
                 }).toThrow('DNS resolution failed during test operation');
@@ -246,7 +247,7 @@ describe('TraylinxAuthClient - Core Functionality', () => {
 
             it('should handle connection refused errors', () => {
                 const error = { code: 'ECONNREFUSED' };
-                
+
                 expect(() => {
                     client._handleRequestError(error, 'test operation');
                 }).toThrow('Connection refused during test operation');
@@ -260,7 +261,7 @@ describe('TraylinxAuthClient - Core Functionality', () => {
                         data: {}
                     }
                 };
-                
+
                 expect(() => {
                     client._handleRequestError(error, 'test operation');
                 }).toThrow('Authentication failed during test operation');
@@ -274,7 +275,7 @@ describe('TraylinxAuthClient - Core Functionality', () => {
                         data: {}
                     }
                 };
-                
+
                 expect(() => {
                     client._handleRequestError(error, 'test operation');
                 }).toThrow('Rate limit exceeded during test operation');
@@ -288,7 +289,7 @@ describe('TraylinxAuthClient - Core Functionality', () => {
                         data: {}
                     }
                 };
-                
+
                 expect(() => {
                     client._handleRequestError(error, 'test operation');
                 }).toThrow('Server error (500) during test operation');
@@ -299,7 +300,7 @@ describe('TraylinxAuthClient - Core Functionality', () => {
                     request: {},
                     message: 'Request setup failed'
                 };
-                
+
                 expect(() => {
                     client._handleRequestError(error, 'test operation');
                 }).toThrow('Network request failed during test operation');
@@ -309,7 +310,7 @@ describe('TraylinxAuthClient - Core Functionality', () => {
                 const error = {
                     message: 'Unknown error occurred'
                 };
-                
+
                 expect(() => {
                     client._handleRequestError(error, 'test operation');
                 }).toThrow('Unexpected error during test operation');
@@ -335,7 +336,7 @@ describe('TraylinxAuthClient - Core Functionality', () => {
                     'Authorization': 'Bearer test_token',
                     'X-Agent-User-Id': 'test_user'
                 };
-                
+
                 const mode = client.detectAuthMode(headers);
                 expect(mode).toBe('bearer');
             });
@@ -345,7 +346,7 @@ describe('TraylinxAuthClient - Core Functionality', () => {
                     'X-Agent-Secret-Token': 'test_token',
                     'X-Agent-User-Id': 'test_user'
                 };
-                
+
                 const mode = client.detectAuthMode(headers);
                 expect(mode).toBe('custom');
             });
@@ -361,7 +362,7 @@ describe('TraylinxAuthClient - Core Functionality', () => {
                     'authorization': 'Bearer test_token',
                     'x-agent-user-id': 'test_user'
                 };
-                
+
                 const mode = client.detectAuthMode(headers);
                 expect(mode).toBe('bearer');
             });

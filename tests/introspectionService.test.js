@@ -11,6 +11,7 @@ describe('IntrospectionService', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        process.env.TRAYLINX_API_BASE_URL = 'https://test.com';
         tokenManager = new TokenManager();
         tokenManager.getAccessToken = jest.fn().mockResolvedValue('test_access_token');
         introspectionService = new IntrospectionService(tokenManager);
@@ -18,9 +19,9 @@ describe('IntrospectionService', () => {
 
     describe('Token Validation', () => {
         it('should return true for a valid token', async () => {
-            axios.post.mockResolvedValue({ 
+            axios.post.mockResolvedValue({
                 status: 200,
-                data: { active: true } 
+                data: { active: true, agent_id: 'user123', scopes: 'a2a', expires_at: Date.now()/1000 + 3600 }
             });
 
             const isValid = await introspectionService.validateToken('valid_secret', 'user123');
@@ -28,7 +29,7 @@ describe('IntrospectionService', () => {
             expect(isValid).toBe(true);
             expect(axios.post).toHaveBeenCalledTimes(1);
             expect(tokenManager.getAccessToken).toHaveBeenCalledTimes(1);
-            
+
             // Verify request parameters
             const [url, data, config] = axios.post.mock.calls[0];
             expect(config.headers.Authorization).toBe('Bearer test_access_token');
@@ -36,9 +37,9 @@ describe('IntrospectionService', () => {
         });
 
         it('should return false for an invalid token', async () => {
-            axios.post.mockResolvedValue({ 
+            axios.post.mockResolvedValue({
                 status: 200,
-                data: { active: false } 
+                data: { active: false }
             });
 
             const isValid = await introspectionService.validateToken('invalid_secret', 'user123');
@@ -47,9 +48,9 @@ describe('IntrospectionService', () => {
         });
 
         it('should handle missing active field in response', async () => {
-            axios.post.mockResolvedValue({ 
+            axios.post.mockResolvedValue({
                 status: 200,
-                data: {} 
+                data: {}
             });
 
             const isValid = await introspectionService.validateToken('test_secret', 'user123');
@@ -58,9 +59,9 @@ describe('IntrospectionService', () => {
         });
 
         it('should handle null response data', async () => {
-            axios.post.mockResolvedValue({ 
+            axios.post.mockResolvedValue({
                 status: 200,
-                data: null 
+                data: null
             });
 
             const isValid = await introspectionService.validateToken('test_secret', 'user123');
@@ -69,9 +70,9 @@ describe('IntrospectionService', () => {
         });
 
         it('should handle malformed JSON response', async () => {
-            axios.post.mockResolvedValue({ 
+            axios.post.mockResolvedValue({
                 status: 200,
-                data: 'invalid json string' 
+                data: 'invalid json string'
             });
 
             const isValid = await introspectionService.validateToken('test_secret', 'user123');
@@ -182,28 +183,28 @@ describe('IntrospectionService', () => {
 
     describe('Request Format', () => {
         it('should send correct introspection request format', async () => {
-            axios.post.mockResolvedValue({ 
+            axios.post.mockResolvedValue({
                 status: 200,
-                data: { active: true } 
+                data: { active: true, agent_id: 'user123', scopes: 'a2a', expires_at: Date.now()/1000 + 3600 }
             });
 
             await introspectionService.validateToken('test_secret_token', 'test_user_id');
 
             const [url, data, config] = axios.post.mock.calls[0];
-            
+
             expect(url).toContain('/oauth/agent/introspect');
             expect(config.headers.Authorization).toBe('Bearer test_access_token');
             expect(config.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
-            
+
             const formData = new URLSearchParams(data);
             expect(formData.get('agent_secret_token')).toBe('test_secret_token');
             expect(formData.get('agent_user_id')).toBe('test_user_id');
         });
 
         it('should handle special characters in token and user ID', async () => {
-            axios.post.mockResolvedValue({ 
+            axios.post.mockResolvedValue({
                 status: 200,
-                data: { active: true } 
+                data: { active: true, agent_id: 'user123', scopes: 'a2a', expires_at: Date.now()/1000 + 3600 }
             });
 
             const specialToken = 'token+with&special=chars';
@@ -213,39 +214,35 @@ describe('IntrospectionService', () => {
 
             const [, data] = axios.post.mock.calls[0];
             const formData = new URLSearchParams(data);
-            
+
             expect(formData.get('agent_secret_token')).toBe(specialToken);
             expect(formData.get('agent_user_id')).toBe(specialUserId);
         });
 
         it('should handle empty token and user ID', async () => {
-            axios.post.mockResolvedValue({ 
+            axios.post.mockResolvedValue({
                 status: 200,
-                data: { active: false } 
+                data: { active: false }
             });
 
             const isValid = await introspectionService.validateToken('', '');
 
             expect(isValid).toBe(false);
-            
-            const [, data] = axios.post.mock.calls[0];
-            const formData = new URLSearchParams(data);
-            
-            expect(formData.get('agent_secret_token')).toBe('');
-            expect(formData.get('agent_user_id')).toBe('');
+
+            expect(axios.post).not.toHaveBeenCalled();
         });
     });
 
     describe('Response Handling', () => {
         it('should handle response with additional metadata', async () => {
-            axios.post.mockResolvedValue({ 
+            axios.post.mockResolvedValue({
                 status: 200,
-                data: { 
+                data: {
                     active: true,
-                    scope: 'a2a',
+                    scopes: 'a2a', agent_id: 'user123', expires_at: Date.now()/1000 + 3600,
                     client_id: 'test_client',
                     exp: 1234567890
-                } 
+                }
             });
 
             const isValid = await introspectionService.validateToken('test_secret', 'user123');
@@ -254,13 +251,13 @@ describe('IntrospectionService', () => {
         });
 
         it('should handle response with active: false and error details', async () => {
-            axios.post.mockResolvedValue({ 
+            axios.post.mockResolvedValue({
                 status: 200,
-                data: { 
+                data: {
                     active: false,
                     error: 'token_expired',
                     error_description: 'The token has expired'
-                } 
+                }
             });
 
             const isValid = await introspectionService.validateToken('expired_token', 'user123');
@@ -269,12 +266,12 @@ describe('IntrospectionService', () => {
         });
 
         it('should handle non-200 status codes with valid JSON', async () => {
-            axios.post.mockResolvedValue({ 
+            axios.post.mockResolvedValue({
                 status: 400,
-                data: { 
+                data: {
                     error: 'invalid_request',
                     error_description: 'Missing required parameter'
-                } 
+                }
             });
 
             const isValid = await introspectionService.validateToken('test_secret', 'user123');
@@ -286,12 +283,12 @@ describe('IntrospectionService', () => {
     describe('Concurrent Validation', () => {
         it('should handle multiple concurrent validation requests', async () => {
             let requestCount = 0;
-            
-            axios.post.mockImplementation(() => {
+
+            axios.post.mockImplementation((url, body) => {
                 requestCount++;
-                return Promise.resolve({ 
+                return Promise.resolve({
                     status: 200,
-                    data: { active: true } 
+                    data: { active: true, agent_id: new URLSearchParams(body).get('agent_user_id'), scopes: 'a2a', expires_at: Date.now()/1000 + 3600 }
                 });
             });
 
@@ -310,7 +307,7 @@ describe('IntrospectionService', () => {
 
         it('should handle mixed success and failure in concurrent requests', async () => {
             axios.post
-                .mockResolvedValueOnce({ status: 200, data: { active: true } })
+                .mockResolvedValueOnce({ status: 200, data: { active: true, agent_id: 'user1', scopes: 'a2a', expires_at: Date.now()/1000 + 3600 } })
                 .mockResolvedValueOnce({ status: 200, data: { active: false } })
                 .mockRejectedValueOnce(new Error('Network error'));
 
@@ -329,27 +326,27 @@ describe('IntrospectionService', () => {
     describe('Configuration and Environment', () => {
         it('should use correct API base URL from environment', async () => {
             process.env.TRAYLINX_API_BASE_URL = 'https://custom.api.com';
-            
-            axios.post.mockResolvedValue({ 
+
+            axios.post.mockResolvedValue({
                 status: 200,
-                data: { active: true } 
+                data: { active: true, agent_id: 'user123', scopes: 'a2a', expires_at: Date.now()/1000 + 3600 }
             });
 
             await introspectionService.validateToken('test_secret', 'user123');
 
             const [url] = axios.post.mock.calls[0];
             expect(url).toBe('https://custom.api.com/oauth/agent/introspect');
-            
+
             // Clean up
             delete process.env.TRAYLINX_API_BASE_URL;
         });
 
         it('should handle missing API base URL gracefully', async () => {
             delete process.env.TRAYLINX_API_BASE_URL;
-            
+
             // This should be handled by the TokenManager or service initialization
             const isValid = await introspectionService.validateToken('test_secret', 'user123');
-            
+
             // The exact behavior depends on implementation, but it should not crash
             expect(typeof isValid).toBe('boolean');
         });
