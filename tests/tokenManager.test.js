@@ -9,10 +9,10 @@ describe('TokenManager', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        
+
         // Save original environment
         originalEnv = { ...process.env };
-        
+
         // Set up test environment
         process.env.TRAYLINX_CLIENT_ID = 'test_client_id';
         process.env.TRAYLINX_CLIENT_SECRET = 'test_client_secret';
@@ -30,7 +30,7 @@ describe('TokenManager', () => {
                 data: {
                     access_token: 'test_access_token',
                     agent_secret_token: 'test_agent_secret_token',
-                    expires_in: 3600,
+                    agent_secret_token_expires_in: 3600, expires_in: 3600,
                 },
             });
 
@@ -41,7 +41,7 @@ describe('TokenManager', () => {
             expect(accessToken).toBe('test_access_token');
             expect(agentSecretToken).toBe('test_agent_secret_token');
             expect(axios.post).toHaveBeenCalledTimes(1);
-            
+
             // Verify request parameters
             const [url, data, config] = axios.post.mock.calls[0];
             expect(url).toBe('https://test.com/oauth/token');
@@ -53,7 +53,7 @@ describe('TokenManager', () => {
                 data: {
                     access_token: 'test_access_token',
                     agent_secret_token: 'test_agent_secret_token',
-                    expires_in: 3600,
+                    agent_secret_token_expires_in: 3600, expires_in: 3600,
                 },
             });
 
@@ -81,7 +81,7 @@ describe('TokenManager', () => {
                     data: {
                         access_token: 'refreshed_access_token',
                         agent_secret_token: 'refreshed_agent_secret_token',
-                        expires_in: 3600,
+                        agent_secret_token_expires_in: 3600, expires_in: 3600,
                     },
                 });
 
@@ -98,7 +98,7 @@ describe('TokenManager', () => {
 
         it('should handle concurrent token requests without duplicate fetches', async () => {
             let fetchCount = 0;
-            
+
             axios.post.mockImplementation(() => {
                 fetchCount++;
                 return new Promise(resolve => {
@@ -107,7 +107,7 @@ describe('TokenManager', () => {
                             data: {
                                 access_token: 'concurrent_access_token',
                                 agent_secret_token: 'concurrent_agent_secret_token',
-                                expires_in: 3600,
+                                agent_secret_token_expires_in: 3600, expires_in: 3600,
                             },
                         });
                     }, 100);
@@ -115,7 +115,7 @@ describe('TokenManager', () => {
             });
 
             const tokenManager = new TokenManager();
-            
+
             // Make multiple concurrent requests
             const promises = [
                 tokenManager.getAccessToken(),
@@ -141,44 +141,44 @@ describe('TokenManager', () => {
                 status: 401,
                 data: { error: 'invalid_client' }
             };
-            
+
             axios.post.mockRejectedValue(authError);
 
             const tokenManager = new TokenManager();
-            
+
             await expect(tokenManager.getAccessToken()).rejects.toThrow();
         });
 
         it('should handle network timeout errors', async () => {
             const timeoutError = new Error('timeout of 30000ms exceeded');
             timeoutError.code = 'ECONNABORTED';
-            
+
             axios.post.mockRejectedValue(timeoutError);
 
             const tokenManager = new TokenManager();
-            
+
             await expect(tokenManager.getAccessToken()).rejects.toThrow();
         });
 
         it('should handle connection refused errors', async () => {
             const connectionError = new Error('connect ECONNREFUSED');
             connectionError.code = 'ECONNREFUSED';
-            
+
             axios.post.mockRejectedValue(connectionError);
 
             const tokenManager = new TokenManager();
-            
+
             await expect(tokenManager.getAccessToken()).rejects.toThrow();
         });
 
         it('should handle DNS resolution errors', async () => {
             const dnsError = new Error('getaddrinfo ENOTFOUND');
             dnsError.code = 'ENOTFOUND';
-            
+
             axios.post.mockRejectedValue(dnsError);
 
             const tokenManager = new TokenManager();
-            
+
             await expect(tokenManager.getAccessToken()).rejects.toThrow();
         });
 
@@ -188,11 +188,11 @@ describe('TokenManager', () => {
                 status: 429,
                 data: { error: 'rate_limit_exceeded' }
             };
-            
+
             axios.post.mockRejectedValue(rateLimitError);
 
             const tokenManager = new TokenManager();
-            
+
             await expect(tokenManager.getAccessToken()).rejects.toThrow();
         });
 
@@ -202,11 +202,11 @@ describe('TokenManager', () => {
                 status: 500,
                 data: { error: 'internal_server_error' }
             };
-            
+
             axios.post.mockRejectedValue(serverError);
 
             const tokenManager = new TokenManager();
-            
+
             await expect(tokenManager.getAccessToken()).rejects.toThrow();
         });
 
@@ -219,7 +219,7 @@ describe('TokenManager', () => {
             });
 
             const tokenManager = new TokenManager();
-            
+
             await expect(tokenManager.getAccessToken()).rejects.toThrow();
         });
 
@@ -229,7 +229,7 @@ describe('TokenManager', () => {
             });
 
             const tokenManager = new TokenManager();
-            
+
             await expect(tokenManager.getAccessToken()).rejects.toThrow();
         });
     });
@@ -244,7 +244,7 @@ describe('TokenManager', () => {
                 data: {
                     access_token: 'env_access_token',
                     agent_secret_token: 'env_agent_secret_token',
-                    expires_in: 3600,
+                    agent_secret_token_expires_in: 3600, expires_in: 3600,
                 },
             });
 
@@ -253,7 +253,7 @@ describe('TokenManager', () => {
 
             const [url, data] = axios.post.mock.calls[0];
             expect(url).toBe('https://env.example.com/oauth/token');
-            
+
             // Check that the correct credentials were sent
             const formData = new URLSearchParams(data);
             expect(formData.get('client_id')).toBe('env_client_id');
@@ -266,7 +266,7 @@ describe('TokenManager', () => {
             delete process.env.TRAYLINX_API_BASE_URL;
 
             const tokenManager = new TokenManager();
-            
+
             await expect(tokenManager.getAccessToken()).rejects.toThrow();
         });
 
@@ -276,7 +276,7 @@ describe('TokenManager', () => {
             process.env.TRAYLINX_API_BASE_URL = 'https://test.com';
 
             const tokenManager = new TokenManager();
-            
+
             await expect(tokenManager.getAccessToken()).rejects.toThrow();
         });
     });
@@ -285,7 +285,7 @@ describe('TokenManager', () => {
         it('should correctly calculate token expiration', async () => {
             const currentTime = Date.now();
             const expiresIn = 3600; // 1 hour
-            
+
             axios.post.mockResolvedValue({
                 data: {
                     access_token: 'test_access_token',
@@ -298,8 +298,8 @@ describe('TokenManager', () => {
             await tokenManager.getAccessToken();
 
             // Check that expiration is set correctly (within a reasonable margin)
-            expect(tokenManager.tokenExpiration).toBeGreaterThan(currentTime + (expiresIn * 1000) - 1000);
-            expect(tokenManager.tokenExpiration).toBeLessThan(currentTime + (expiresIn * 1000) + 1000);
+            expect(tokenManager.tokenExpiration).toBeGreaterThan(currentTime + ((expiresIn - 30) * 1000) - 1000);
+            expect(tokenManager.tokenExpiration).toBeLessThan(currentTime + ((expiresIn - 30) * 1000) + 1000);
         });
 
         it('should handle zero expiration time', async () => {
@@ -312,9 +312,10 @@ describe('TokenManager', () => {
             });
 
             const tokenManager = new TokenManager();
-            await tokenManager.getAccessToken();
+            await expect(tokenManager.getAccessToken()).rejects.toThrow();
+            expect(tokenManager.accessToken).toBeNull();
 
-            // Token should be considered expired immediately
+            // Invalid expiry clears credentials; token must not be used immediately
             expect(tokenManager.tokenExpiration).toBeLessThanOrEqual(Date.now());
         });
 
@@ -328,9 +329,10 @@ describe('TokenManager', () => {
             });
 
             const tokenManager = new TokenManager();
-            await tokenManager.getAccessToken();
+            await expect(tokenManager.getAccessToken()).rejects.toThrow();
+            expect(tokenManager.accessToken).toBeNull();
 
-            // Token should be considered expired
+            // Invalid expiry clears credentials; token must not be used
             expect(tokenManager.tokenExpiration).toBeLessThan(Date.now());
         });
     });
@@ -341,7 +343,7 @@ describe('TokenManager', () => {
                 data: {
                     access_token: 'test_access_token',
                     agent_secret_token: 'test_agent_secret_token',
-                    expires_in: 3600,
+                    agent_secret_token_expires_in: 3600, expires_in: 3600,
                 },
             });
 
@@ -349,10 +351,10 @@ describe('TokenManager', () => {
             await tokenManager.getAccessToken();
 
             const [url, data, config] = axios.post.mock.calls[0];
-            
+
             expect(url).toBe('https://test.com/oauth/token');
             expect(config.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
-            
+
             const formData = new URLSearchParams(data);
             expect(formData.get('grant_type')).toBe('client_credentials');
             expect(formData.get('client_id')).toBe('test_client_id');
@@ -368,7 +370,7 @@ describe('TokenManager', () => {
                 data: {
                     access_token: 'test_access_token',
                     agent_secret_token: 'test_agent_secret_token',
-                    expires_in: 3600,
+                    agent_secret_token_expires_in: 3600, expires_in: 3600,
                 },
             });
 
@@ -377,7 +379,7 @@ describe('TokenManager', () => {
 
             const [, data] = axios.post.mock.calls[0];
             const formData = new URLSearchParams(data);
-            
+
             expect(formData.get('client_id')).toBe('client+with+special&chars');
             expect(formData.get('client_secret')).toBe('secret=with&special+chars');
         });
