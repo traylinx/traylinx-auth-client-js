@@ -2,29 +2,24 @@
 
 Sentinel Pass authentication for Traylinx agent-to-agent communication.
 
-> **1.1.0-rc.1: opt-in release candidate. Deployment approval is integration-specific.**
-> Existing stable installations are not upgraded by this release.
+> **2.0.0: the hardened Sentinel Pass client.** A major version: Node.js 22+, HTTPS only and
+> stricter credentials break 1.0.x callers, so `^1` ranges are not upgraded. See HARDENING.md.
 
 ## Install
 
 Requires **Node.js 22 or later**. Runtime dependencies: Axios 1.x (`>=1.20.0`)
 and Joi 17.x (`>=17.13.8`), installed automatically.
 
-**Published 9 November 2026** under the npm `next` tag; `latest` stays on 1.0.1, so a
-plain `npm install traylinx-auth-client` does not pick up this candidate. Pin it exactly:
-
 ```bash
-npm install --save-exact traylinx-auth-client@1.1.0-rc.1
+npm install traylinx-auth-client@^2
 ```
 
-The registry artifact is the sealed RC tarball, unchanged: SHA-256
-`2713a86810f13e5badfd6710f39e17065bad004120ee1c450d55c3d91fba026e` (npm shasum
-`3fd85fdcc5516571d06ea7be54318c8560ac4b2d`). These source-document corrections do not
-rebuild or replace it.
+2.0.0 is the 1.1.0-rc.1 code unchanged, released 9 November 2026. Deployment approval is still
+integration-specific: see "Deployment gates" in HARDENING.md.
 
 ## Deployment status — 26 October 2026
 
-The exact sealed JavaScript archive is deployed in the explicitly granted html2md
+The exact sealed 1.1.0-rc.1 archive (same code as 2.0.0) is deployed in the explicitly granted html2md
 capture integration. Bounded production proof/grant/revocation and human-compatibility
 checks passed. The receiver adds its own bounded verifier-token reuse while retaining
 two live caller checks; this does not change SDK bytes or provide a general positive
@@ -175,6 +170,4 @@ transport and cancellation. Caller authorization is still checked before capture
 before content release. One safe introspection retry may follow an invalid verifier
 token; this does not enable generic OAuth issuance or business-action replay.
 
-These consumer changes are not a new published SDK feature. The sealed
-`1.1.0-rc.1` tarball is unchanged and remains subject to the recorded npm publication
-gate. This README update is local; it does not rewrite that release artifact.
+These consumer changes are not an SDK feature; the SDK code is the same in 1.1.0-rc.1 and 2.0.0.

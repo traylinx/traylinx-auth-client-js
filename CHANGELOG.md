@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-11-09
+
+The hardened client of 1.1.0-rc.1 as the stable release, with no code change. It is a major
+version because the changes below break callers of 1.0.x: Node.js 22 or later, HTTPS only,
+ambiguous credentials refused, sanitized errors. `^1` ranges stay on 1.0.x.
+Already in production use through the html2md capture integration and the Traylinx Search Agent.
+
 ## [1.1.0-rc.1] - 2026-10-22 (release candidate)
 
 - Harden credential transport, retries, independent token lifetimes and introspection binding.
