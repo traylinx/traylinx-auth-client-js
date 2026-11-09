@@ -2,7 +2,7 @@
 
 Sentinel Pass authentication for Traylinx agent-to-agent communication.
 
-> **1.1.0-rc.1: opt-in release candidate. Not qualified for production deployment.**
+> **1.1.0-rc.1: opt-in release candidate. Deployment approval is integration-specific.**
 > Existing stable installations are not upgraded by this release.
 
 ## Install
@@ -10,11 +10,26 @@ Sentinel Pass authentication for Traylinx agent-to-agent communication.
 Requires **Node.js 22 or later**. Runtime dependencies: Axios 1.x (`>=1.20.0`)
 and Joi 17.x (`>=17.13.8`), installed automatically.
 
+**Published 9 November 2026** under the npm `next` tag; `latest` stays on 1.0.1, so a
+plain `npm install traylinx-auth-client` does not pick up this candidate. Pin it exactly:
+
 ```bash
 npm install --save-exact traylinx-auth-client@1.1.0-rc.1
 ```
 
-The prerelease is published under the `next` tag; `latest` remains the stable channel.
+The registry artifact is the sealed RC tarball, unchanged: SHA-256
+`2713a86810f13e5badfd6710f39e17065bad004120ee1c450d55c3d91fba026e` (npm shasum
+`3fd85fdcc5516571d06ea7be54318c8560ac4b2d`). These source-document corrections do not
+rebuild or replace it.
+
+## Deployment status — 26 October 2026
+
+The exact sealed JavaScript archive is deployed in the explicitly granted html2md
+capture integration. Bounded production proof/grant/revocation and human-compatibility
+checks passed. The receiver adds its own bounded verifier-token reuse while retaining
+two live caller checks; this does not change SDK bytes or provide a general positive
+authorization cache. No throughput, long-running stability or all-platform guarantee
+is implied. Other integrations need their own gates.
 
 ## Configure
 
@@ -115,6 +130,21 @@ Existing helper entry points remain, but HTTPS enforcement, runtime floors,
 stricter verification and error behavior are intentional migration changes.
 See [HARDENING.md](HARDENING.md) for the full contract and transport limitations.
 
+## Integration checklist
+
+1. Create the caller agent and securely store its OAuth credentials and UUID.
+2. Configure the receiving service with a dedicated verifier agent. Independently
+   check its OAuth application owner; setting `agentUserId` alone does not prove
+   that the client credentials belong to that UUID.
+3. Verify incoming proof with Sentinel, then separately enforce the receiving
+   service's grants. Keep ordinary user authentication separate; never fall back
+   to it after an agent proof fails.
+4. Test invalid/expired/revoked proof, disabled caller and verifier, missing grants,
+   TLS failure, cancellation and service outages before enabling real traffic.
+5. Recheck authentication before releasing long-running sensitive results.
+   Budget for the extra introspection and token exchanges; do not claim capacity
+   from a small fixture test.
+
 ## Qualification
 
 Tests use synthetic credentials and owned loopback HTTPS fixtures. Local tests do
@@ -136,3 +166,15 @@ MIT. See [LICENSE](LICENSE).
 npm ci
 npm test -- --runInBand
 ```
+
+### Consumer-side verifier reuse (local candidate)
+
+The html2md integration candidate wraps this unchanged SDK in a bounded, memory-only
+verifier lifecycle. Shared token refresh is separate from request-local introspection
+transport and cancellation. Caller authorization is still checked before capture and
+before content release. One safe introspection retry may follow an invalid verifier
+token; this does not enable generic OAuth issuance or business-action replay.
+
+These consumer changes are not a new published SDK feature. The sealed
+`1.1.0-rc.1` tarball is unchanged and remains subject to the recorded npm publication
+gate. This README update is local; it does not rewrite that release artifact.
